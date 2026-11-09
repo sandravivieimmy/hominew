@@ -14,6 +14,8 @@ class Calibracion extends ActiveRecord
         'certificado_calibracion'
     ];
 
+    protected static $columnasFecha = ['fecha_realizada', 'fecha_proxima'];
+
     public $id;
     public $equipo_id;
     public $fecha_realizada;

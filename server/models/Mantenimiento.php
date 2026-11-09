@@ -14,6 +14,8 @@ class Mantenimiento extends ActiveRecord
         'fecha_proxima',
     ];
 
+    protected static $columnasFecha = ['fecha_realizado', 'fecha_proxima'];
+
     public $id;
     public $equipo_id;
     public $fecha_realizado;

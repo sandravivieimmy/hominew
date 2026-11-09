@@ -10,8 +10,25 @@ class ActiveRecord
     protected static $tabla = '';
     protected static $columnasDB = [];
 
+    // Columnas DATE: un valor vacío o inválido (p. ej. "FUERA DE SERVICIO") se guarda como NULL
+    protected static $columnasFecha = [];
+
     // Alertas y Mensajes
     protected static $alertas = [];
+
+    public static function getDB()
+    {
+        return self::$db;
+    }
+
+    // Valor ya sanitizado -> fragmento SQL (entre comillas, o NULL para fechas no válidas)
+    protected static function valorSQL($columna, $valor)
+    {
+        if (in_array($columna, static::$columnasFecha, true)) {
+            return preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $valor) ? "'{$valor}'" : 'NULL';
+        }
+        return "'{$valor}'";
+    }
 
     // Definir la conexión a la BD - includes/database.php
     public static function setDB($database)
@@ -165,9 +182,13 @@ class ActiveRecord
         // Insertar en la base de datos
         $query = " INSERT INTO " . static::$tabla . " ( ";
         $query .= join(', ', array_keys($atributos));
-        $query .= " ) VALUES ('";
-        $query .= join("', '", array_values($atributos));
-        $query .= "') ";
+        $query .= " ) VALUES (";
+        $valoresSQL = [];
+        foreach ($atributos as $columna => $valor) {
+            $valoresSQL[] = static::valorSQL($columna, $valor);
+        }
+        $query .= join(', ', $valoresSQL);
+        $query .= ") ";
 
         // Resultado de la consulta
         $resultado = self::$db->query($query);
@@ -186,7 +207,7 @@ class ActiveRecord
         // Iterar para ir agregando cada campo de la BD
         $valores = [];
         foreach ($atributos as $key => $value) {
-            $valores[] = "{$key}='{$value}'";
+            $valores[] = "{$key}=" . static::valorSQL($key, $value);
         }
 
         // Consulta SQL

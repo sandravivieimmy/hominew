@@ -14,8 +14,12 @@ const UCI_LIST = ucisDATA.map((uci) => uci.nombre);
 const UCI_META = {};
 
 ucisDATA.forEach((uci) => {
-  const palabras = uci.nombre.trim().split(/\s+/);
-  const shortName = palabras[1] || uci.nombre;
+  // "UNIDAD DE CUIDADO INTENSIVO PEDIATRICO CCI" -> "PEDIATRICO CCI"
+  const shortName =
+    uci.nombre
+      .trim()
+      .replace(/^UNIDAD DE CUIDADO (INTENSIVO|INTERMEDIO)\s+/i, "") ||
+    uci.nombre;
 
   UCI_META[uci.nombre] = {
     short: shortName,
@@ -226,8 +230,10 @@ function applyRemotePayload(payload) {
 
     saveOverridesToStorage(OVERRIDES);
     saveNewItemsToStorage(NEW_ITEMS);
-    DATA = buildData();
-    renderAll();
+    buildData().then((d) => {
+      DATA = d;
+      renderAll();
+    });
     showSyncToast("Inventario actualizado desde otro computador");
   } finally {
     syncApplyingRemote = false;
@@ -1216,7 +1222,7 @@ function editFormHtml(item) {
   const uciOptions = ucisDATA
     .map(
       (u) =>
-        `<option value="${escapeHtml(u.id)}" ${u === item.uci ? "selected" : ""}>${escapeHtml(UCI_META[u.nombre].short)}</option>`,
+        `<option value="${escapeHtml(u.id)}" ${u.nombre === item.uci ? "selected" : ""}>${escapeHtml(UCI_META[u.nombre].short)}</option>`,
     )
     .join("");
   const fieldsHtml = EDIT_FIELDS.map((f) => {
@@ -1345,8 +1351,10 @@ document.addEventListener("keydown", (e) => {
 window.enterEditMode = function () {
   if (currentModalItem) renderModalEdit(currentModalItem);
 };
+// Cancelar descarta los cambios y cierra el modal (igual que en "Agregar equipo"),
+// para que el fondo oscuro no siga tapando los botones de la página.
 window.cancelEdit = function () {
-  if (currentModalItem) renderModalView(currentModalItem);
+  closeDetailModal();
 };
 function readEditFormValues() {
   const uciEl = document.getElementById("edit-uci");
@@ -1365,19 +1373,76 @@ function readEditFormValues() {
     values.frecuenciaMtto = "FUERA DE SERVICIO";
     values.calibracion = "FUERA DE SERVICIO";
     values.proximaCalibracion = "FUERA DE SERVICIO";
+  } else if (values.frecuenciaMtto === "FUERA DE SERVICIO") {
+    // Se desmarcó "fuera de servicio": limpiar la marca que quedó en la frecuencia
+    values.frecuenciaMtto = "";
   }
   return values;
 }
-window.saveEditForm = function () {
+window.saveEditForm = async function () {
   if (!currentModalItem) return;
   const id = currentModalItem.id;
-  const updated = readEditFormValues();
-  OVERRIDES[id] = { ...(OVERRIDES[id] || {}), ...updated };
-  saveOverridesToStorage(OVERRIDES);
-  DATA = buildData();
-  renderAll();
-  const fresh = DATA.find((d) => d.id === id);
-  if (fresh) renderModalView(fresh);
+  const v = readEditFormValues();
+
+  if (!v.equipo) {
+    alert("El nombre del equipo es obligatorio");
+    return;
+  }
+
+  const payload = {
+    id,
+    uci_id: v.uci,
+    ubicacion: v.ubicacion || "",
+    equipo: v.equipo,
+    marca: v.marca || "",
+    modelo: v.modelo || "",
+    serie: v.serie || "",
+    placa: v.placa || "",
+    registro_invima: v.registroInvima || "",
+    clasificacion_invima: v.clasificacionInvima || "",
+    mantenimiento: {
+      frecuencia: v.frecuenciaMtto || "",
+      fecha_realizado: v.mttoRealizado,
+      fecha_proxima: v.mttoProximo,
+    },
+    calibracion: {
+      fecha_realizada: v.calibracion,
+      fecha_proxima: v.proximaCalibracion,
+      certificado_calibracion: v.codigoCalibracion || "",
+    },
+  };
+
+  const saveBtn = document.querySelector("#detailModalActions .dm-btn.primary");
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Guardando…";
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/equipos/actualizar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data || !data.ok) {
+      throw new Error((data && data.error) || `HTTP ${response.status}`);
+    }
+
+    // Recargar desde la base de datos para mostrar lo realmente guardado
+    DATA = await buildData();
+    renderAll();
+    const fresh = DATA.find((d) => String(d.id) === String(id));
+    if (fresh) renderModalView(fresh);
+    else closeDetailModal();
+  } catch (error) {
+    console.error("No se pudo guardar la edición:", error);
+    alert("No se pudieron guardar los cambios: " + error.message);
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Guardar";
+    }
+  }
 };
 
 // window.saveNewEquipment = function () {
@@ -1424,7 +1489,7 @@ window.saveNewEquipmentCopy = async function () {
 
   const newEquipo = {
     uci_id: values.uci,
-    ubicacion: values.uci?.toUpperCase() || "",
+    ubicacion: values.ubicacion || "",
     equipo: values.equipo,
     marca: values.marca || "",
     modelo: values.modelo || "",
@@ -1444,7 +1509,7 @@ window.saveNewEquipmentCopy = async function () {
     });
 
     if (!equipoResponse.ok) {
-      throw new Error(`Error en el servidor: ${response.statusText}`);
+      throw new Error(`Error en el servidor: ${equipoResponse.statusText}`);
     }
 
     const equipoData = await equipoResponse.json();
@@ -1487,20 +1552,26 @@ window.saveNewEquipmentCopy = async function () {
       );
 
       if (!mantenimientoResponse.ok) {
-        throw new Error(`Error en el servidor: ${response.statusText}`);
+        throw new Error(
+          `Error en el servidor: ${mantenimientoResponse.statusText}`,
+        );
       }
 
       if (!calibracionResponse.ok) {
-        throw new Error(`Error en el servidor: ${response.statusText}`);
+        throw new Error(
+          `Error en el servidor: ${calibracionResponse.statusText}`,
+        );
       }
 
       DATA = await buildData();
       renderAll();
+      closeDetailModal();
 
       alert("Equipo guardado correctamente.");
     }
   } catch (error) {
     console.error("Hubo un problema al enviar el equipo:", error);
+    alert("No se pudo guardar el equipo: " + error.message);
   }
 
   //   // DATA = buildDataFromDatabase(); // o volver a consultar la API
