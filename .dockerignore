@@ -1,0 +1,5 @@
+.git
+database
+render.yaml
+Dockerfile
+**/*.md

@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: homi
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      # Datos de tu MySQL externo (se piden al crear el Blueprint en Render)
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASS
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_SSL
+        value: "true"
+      # Opcional: certificado CA del proveedor (Aiven lo entrega). Pegarlo completo.
+      - key: DB_SSL_CA_PEM
+        sync: false

@@ -1,6 +1,8 @@
+import { API_BASE } from "./config.js";
+
 export async function cargarUCIS() {
   try {
-    const API_UCIS = "http://localhost:8000/ucis";
+    const API_UCIS = `${API_BASE}/ucis`;
     const response = await fetch(API_UCIS);
 
     if (!response.ok) {
@@ -17,7 +19,7 @@ export async function cargarUCIS() {
 
 export async function cargarEquipos() {
   try {
-    const API_EQUIPOS = "http://localhost:8000/equipos";
+    const API_EQUIPOS = `${API_BASE}/equipos`;
     const response = await fetch(API_EQUIPOS);
 
     if (!response.ok) {

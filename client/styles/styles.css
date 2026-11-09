@@ -720,6 +720,21 @@ button {
   font-size: 19px;
   color: var(--ink-900);
 }
+.gauge-block-title {
+  text-align: center;
+}
+.gauge-month-label {
+  margin-top: -6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--teal-600);
+}
+.gauge-center-sm .pct-sub {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--ink-500);
+  margin-top: 2px;
+}
 .gauge-legend-sm {
   width: 100%;
   display: flex;
@@ -749,6 +764,24 @@ button {
 .uci-content-col {
   padding: 20px 24px;
   min-width: 0;
+  /* La altura la define el panel de gauges (izquierda); el contenido se ajusta a ella */
+  display: flex;
+  flex-direction: column;
+  contain: size;
+  min-height: 480px;
+}
+.uci-content-col > div[id^="content-"] {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.uci-content-col .table-scroll-y,
+.uci-content-col .calendar-strip,
+.uci-content-col .hist-list {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
 }
 .subtabs {
   display: flex;
@@ -1498,7 +1531,25 @@ footer b {
     border-right: none;
     border-bottom: 1px solid var(--line-soft);
     flex-direction: row;
+    flex-wrap: wrap;
     justify-content: space-around;
+  }
+  .uci-content-col {
+    contain: none;
+    min-height: 0;
+  }
+  .uci-content-col .table-scroll-y {
+    flex: none;
+    max-height: 480px;
+  }
+  .uci-content-col .calendar-strip,
+  .uci-content-col .hist-list {
+    flex: none;
+    max-height: 340px;
+  }
+  .gauge-block {
+    width: 260px;
+    border-bottom: none;
   }
   .vitals {
     grid-template-columns: repeat(3, 1fr);

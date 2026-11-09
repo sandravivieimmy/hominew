@@ -1,4 +1,5 @@
 import { inventoryData, cargarEquipos, cargarUCIS } from "./data.js";
+import { API_BASE } from "./config.js";
 
 let equiposDATA = await cargarEquipos();
 const ucisDATA = await cargarUCIS();
@@ -395,7 +396,7 @@ function closeSyncModal() {}
 async function buildData() {
   try {
     // 1. Consultar la API principal de equipos
-    const response = await fetch("http://localhost:8000/equipos/all");
+    const response = await fetch(`${API_BASE}/equipos/all`);
 
     if (!response.ok) {
       throw new Error(`Error al obtener equipos: ${response.statusText}`);
@@ -681,6 +682,8 @@ function renderUciSections() {
       const allUciItems = DATA.filter((i) => i.uci === uci);
       drawSubGauge(`mtto-${slug(uci)}`, computeSubStats(allUciItems, "mtto"));
       drawSubGauge(`cal-${slug(uci)}`, computeSubStats(allUciItems, "cal"));
+      drawNextMonthGauge(`nm-mtto-${slug(uci)}`, allUciItems, "mtto");
+      drawNextMonthGauge(`nm-cal-${slug(uci)}`, allUciItems, "cal");
       renderStatPills(uci, computeGlobalStats(allUciItems));
       if (!sectionTab[uci]) sectionTab[uci] = "tabla";
       renderSubtabContent(uci, items);
@@ -738,6 +741,18 @@ function sectionSkeleton(uci) {
           <div class="gauge-block-title">Calibración</div>
           <div class="gauge-wrap-sm" id="gaugewrap-cal-${slug(uci)}"></div>
           <div class="gauge-legend-sm" id="legend-cal-${slug(uci)}"></div>
+        </div>
+        <div class="gauge-block">
+          <div class="gauge-block-title">Mantenimientos para el próximo mes</div>
+          <div class="gauge-month-label">${nextMonthLabel()}</div>
+          <div class="gauge-wrap-sm" id="gaugewrap-nm-mtto-${slug(uci)}"></div>
+          <div class="gauge-legend-sm" id="legend-nm-mtto-${slug(uci)}"></div>
+        </div>
+        <div class="gauge-block">
+          <div class="gauge-block-title">Calibración para el próximo mes</div>
+          <div class="gauge-month-label">${nextMonthLabel()}</div>
+          <div class="gauge-wrap-sm" id="gaugewrap-nm-cal-${slug(uci)}"></div>
+          <div class="gauge-legend-sm" id="legend-nm-cal-${slug(uci)}"></div>
         </div>
       </div>
       <div class="uci-content-col">
@@ -840,6 +855,67 @@ function drawSubGauge(prefix, s) {
     <div class="row"><span class="sq" style="background:var(--ok-500)"></span>Ejecutado<b>${s.verde}</b></div>
     <div class="row"><span class="sq" style="background:var(--warn-500)"></span>Próximo<b>${s.amarillo}</b></div>
     <div class="row"><span class="sq" style="background:var(--crit-500)"></span>Vencido<b>${s.rojo}</b></div>
+    ${s.fuera > 0 ? `<div class="row"><span class="sq" style="background:var(--off-500)"></span>Fuera<b>${s.fuera}</b></div>` : ""}
+    ${s.na > 0 ? `<div class="row"><span class="sq" style="background:var(--na-500)"></span>No aplica<b>${s.na}</b></div>` : ""}
+  `;
+}
+
+/* ========== Programación del próximo mes (mes calendario siguiente) ========== */
+function nextMonthRange() {
+  const start = new Date(TODAY.getFullYear(), TODAY.getMonth() + 1, 1);
+  const end = new Date(TODAY.getFullYear(), TODAY.getMonth() + 2, 1);
+  return { start, end };
+}
+function nextMonthLabel() {
+  const { start } = nextMonthRange();
+  const txt = start.toLocaleDateString("es-CO", {
+    month: "long",
+    year: "numeric",
+  });
+  return txt.charAt(0).toUpperCase() + txt.slice(1);
+}
+
+function computeNextMonthStats(items, kind) {
+  const { start, end } = nextMonthRange();
+  let proximoMes = 0,
+    otras = 0,
+    fuera = 0,
+    na = 0;
+  items.forEach((i) => {
+    if (i._overall.status === "fuera") {
+      fuera++;
+      return;
+    }
+    const d = parseDate(kind === "mtto" ? i.mttoProximo : i.proximaCalibracion);
+    if (!d) na++;
+    else if (d >= start && d < end) proximoMes++;
+    else otras++;
+  });
+  return { proximoMes, otras, fuera, na, total: items.length };
+}
+
+function drawNextMonthGauge(prefix, items, kind) {
+  const wrap = document.getElementById(`gaugewrap-${prefix}`);
+  if (!wrap) return;
+  const s = computeNextMonthStats(items, kind);
+  const programados = s.proximoMes + s.otras;
+  const pct = programados ? Math.round((s.proximoMes / programados) * 100) : 0;
+  wrap.innerHTML = donutSVG(
+    [
+      { value: s.proximoMes, color: "#13A0A8" },
+      { value: s.otras, color: "#C9D6DE" },
+    ],
+    132,
+    14,
+  );
+  const center = document.createElement("div");
+  center.className = "gauge-center-sm";
+  center.innerHTML = `<div class="pct-sm">${s.proximoMes}</div><div class="pct-sub">${pct}% de ${programados}</div>`;
+  wrap.appendChild(center);
+  const label = kind === "mtto" ? "Mantenimientos" : "Calibraciones";
+  document.getElementById(`legend-${prefix}`).innerHTML = `
+    <div class="row"><span class="sq" style="background:#13A0A8"></span>${label} próximo mes<b>${s.proximoMes}</b></div>
+    <div class="row"><span class="sq" style="background:#C9D6DE"></span>Otras fechas<b>${s.otras}</b></div>
     ${s.fuera > 0 ? `<div class="row"><span class="sq" style="background:var(--off-500)"></span>Fuera<b>${s.fuera}</b></div>` : ""}
     ${s.na > 0 ? `<div class="row"><span class="sq" style="background:var(--na-500)"></span>No aplica<b>${s.na}</b></div>` : ""}
   `;
@@ -1359,7 +1435,7 @@ window.saveNewEquipmentCopy = async function () {
   };
 
   try {
-    const equipoResponse = await fetch("http://localhost:8000/equipos/crear", {
+    const equipoResponse = await fetch(`${API_BASE}/equipos/crear`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1389,7 +1465,7 @@ window.saveNewEquipmentCopy = async function () {
 
     if (equipoData.resultado) {
       const mantenimientoResponse = await fetch(
-        "http://localhost:8000/mantenimientos/crear",
+        `${API_BASE}/mantenimientos/crear`,
         {
           method: "POST",
           headers: {
@@ -1400,7 +1476,7 @@ window.saveNewEquipmentCopy = async function () {
       );
 
       const calibracionResponse = await fetch(
-        "http://localhost:8000/calibraciones/crear",
+        `${API_BASE}/calibraciones/crear`,
         {
           method: "POST",
           headers: {
