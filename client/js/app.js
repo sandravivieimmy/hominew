@@ -506,7 +506,7 @@ function renderVitals() {
     <div class="vital">
       <div class="vital-label"><span class="sq" style="background:var(--cyan-400)"></span>Equipos monitoreados</div>
       <div class="vital-value">${s.total}<small>uds</small></div>
-      <div class="vital-sub">3 UCIs intermedias · HOMI</div>
+      <div class="vital-sub">${UCI_LIST.length} UCIs · HOMI</div>
     </div>
     <div class="vital ok">
       <div class="vital-label"><span class="sq" style="background:#5FE0A5"></span>Cumplimiento global</div>
@@ -1714,7 +1714,7 @@ document.getElementById("aiInput").addEventListener("keydown", (e) => {
 });
 
 pushBotMsg(
-  "Hola, soy el asistente de mantenimiento de HOMI. Puedo responder preguntas sobre el inventario de equipos biomédicos de las UCIs Intermedias (Neonatal, Quemados y P1): vencimientos, calibraciones próximas, cumplimiento por unidad y más. Conecta tu clave de Gemini para consultas libres, o usa las sugerencias rápidas.",
+  "Hola, soy el asistente de mantenimiento de HOMI. Puedo responder preguntas sobre el inventario de equipos biomédicos de las UCIs: vencimientos, calibraciones próximas, cumplimiento por unidad y más. Conecta tu clave de Gemini para consultas libres, o usa las sugerencias rápidas.",
 );
 
 renderAll();
