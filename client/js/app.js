@@ -1073,11 +1073,12 @@ function detailPanelHtml(i) {
     ["Clasificación de registro INVIMA", i.clasificacionInvima || "—"],
     ["Responsable mantenimiento", responsableMtto(i)],
     ["Responsable calibración", responsableCal(i)],
+    ["OBSERVACIONES / COMENTARIOS", i.observaciones || "—", true],
   ];
   return `<div class="eq-detail-grid">${rows
     .map(
-      ([l, v]) => `
-    <div class="eq-detail-item"><span class="l">${escapeHtml(l)}</span><span class="v">${escapeHtml(v ?? "") || "—"}</span></div>`,
+      ([l, v, wide]) => `
+    <div class="eq-detail-item${wide ? " wide" : ""}"><span class="l">${escapeHtml(l)}</span><span class="v">${escapeHtml(v ?? "") || "—"}</span></div>`,
     )
     .join("")}
   </div>`;
@@ -1202,6 +1203,11 @@ const EDIT_FIELDS = [
     label: "NÚMERO DE CERTIFICADO DE ASEGURAMIENTO METROLÓGICO",
     type: "text",
   },
+  {
+    key: "observaciones",
+    label: "OBSERVACIONES / COMENTARIOS",
+    type: "textarea",
+  },
 ];
 
 function dateFieldValue(v) {
@@ -1233,6 +1239,12 @@ function editFormHtml(item) {
         : raw === null || raw === undefined
           ? ""
           : String(raw);
+    if (f.type === "textarea") {
+      return `<div class="edit-field edit-field-wide">
+      <label>${escapeHtml(f.label)}</label>
+      <textarea id="edit-${f.key}" rows="4" maxlength="1000" placeholder="Escribe aquí observaciones o comentarios sobre este equipo…">${escapeHtml(val)}</textarea>
+    </div>`;
+    }
     return `<div class="edit-field">
       <label>${escapeHtml(f.label)}</label>
       <input type="${f.type === "date" ? "date" : "text"}" id="edit-${f.key}" value="${escapeHtml(val)}">
@@ -1265,8 +1277,10 @@ function renderModalView(item) {
     `${UCI_META[item.uci].short} · ${item._code}`;
   document.getElementById("detailModalBody").innerHTML =
     statusBadgesHtml(item) + detailPanelHtml(item);
-  document.getElementById("detailModalActions").innerHTML =
-    `<button class="dm-btn primary" onclick="window.enterEditMode()">Editar</button>`;
+  document.getElementById("detailModalActions").innerHTML = `
+    <button class="dm-btn danger" onclick="window.deleteEquipment()">Eliminar</button>
+    <button class="dm-btn primary" onclick="window.enterEditMode()">Editar</button>
+  `;
 }
 
 function renderModalEdit(item) {
@@ -1321,6 +1335,7 @@ function openCreateModal() {
     codigoCalibracion: "",
     registroInvima: "",
     clasificacionInvima: "",
+    observaciones: "",
     _mtto: { status: "na", days: null },
     _cal: { status: "na", days: null },
     _overall: { status: "na", days: null, kind: "ninguno" },
@@ -1379,6 +1394,47 @@ function readEditFormValues() {
   }
   return values;
 }
+window.deleteEquipment = async function () {
+  if (!currentModalItem || currentModalItem.id === null) return;
+  const item = currentModalItem;
+
+  const ok = confirm(
+    `¿Eliminar el equipo "${item.equipo}" (${item._code})?\n\n` +
+      "Se borrarán también su mantenimiento y su calibración. Esta acción no se puede deshacer.",
+  );
+  if (!ok) return;
+
+  const btn = document.querySelector("#detailModalActions .dm-btn.danger");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Eliminando…";
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/equipos/eliminar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: item.id }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data || !data.ok) {
+      throw new Error((data && data.error) || `HTTP ${response.status}`);
+    }
+
+    closeDetailModal();
+    currentModalItem = null;
+    DATA = await buildData();
+    renderAll();
+  } catch (error) {
+    console.error("No se pudo eliminar el equipo:", error);
+    alert("No se pudo eliminar el equipo: " + error.message);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Eliminar";
+    }
+  }
+};
+
 window.saveEditForm = async function () {
   if (!currentModalItem) return;
   const id = currentModalItem.id;
@@ -1400,6 +1456,7 @@ window.saveEditForm = async function () {
     placa: v.placa || "",
     registro_invima: v.registroInvima || "",
     clasificacion_invima: v.clasificacionInvima || "",
+    observaciones: v.observaciones || "",
     mantenimiento: {
       frecuencia: v.frecuenciaMtto || "",
       fecha_realizado: v.mttoRealizado,
@@ -1497,6 +1554,7 @@ window.saveNewEquipmentCopy = async function () {
     placa: values.placa || "",
     registro_invima: values.registroInvima || "",
     clasificacion_invima: values.clasificacionInvima || "",
+    observaciones: values.observaciones || "",
   };
 
   try {

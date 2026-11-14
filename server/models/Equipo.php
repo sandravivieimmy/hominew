@@ -16,7 +16,8 @@ class Equipo extends ActiveRecord
         'serie',
         'placa',
         'registro_invima',
-        'clasificacion_invima'
+        'clasificacion_invima',
+        'observaciones'
     ];
 
     public $id;
@@ -29,6 +30,7 @@ class Equipo extends ActiveRecord
     public $placa;
     public $registro_invima;
     public $clasificacion_invima;
+    public $observaciones;
 
     public function __construct($args = [])
     {
@@ -42,5 +44,6 @@ class Equipo extends ActiveRecord
         $this->placa = $args['placa'] ?? '';
         $this->registro_invima = $args['registro_invima'] ?? '';
         $this->clasificacion_invima = $args['clasificacion_invima'] ?? '';
+        $this->observaciones = $args['observaciones'] ?? '';
     }
 }

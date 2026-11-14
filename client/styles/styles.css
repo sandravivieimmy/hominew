@@ -1434,6 +1434,19 @@ footer b {
 .dm-btn.ghost:hover {
   background: var(--bg-soft);
 }
+.dm-btn.danger {
+  background: var(--crit-100);
+  border: 1px solid var(--crit-500);
+  color: var(--crit-500);
+}
+.dm-btn.danger:hover:not(:disabled) {
+  background: var(--crit-500);
+  color: #fff;
+}
+.dm-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
 .modal-status-row {
   display: flex;
   gap: 10px;
@@ -1489,6 +1502,32 @@ footer b {
   letter-spacing: 0.4px;
   font-weight: 700;
   color: var(--ink-500);
+}
+.edit-field-wide {
+  grid-column: 1 / -1;
+}
+.edit-field textarea {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-900);
+  background: var(--bg-soft);
+  outline: none;
+  resize: vertical;
+  min-height: 84px;
+}
+.edit-field textarea:focus {
+  border-color: var(--teal-500);
+  background: #fff;
+}
+.eq-detail-item.wide {
+  grid-column: 1 / -1;
+}
+.eq-detail-item.wide .v {
+  white-space: pre-wrap;
 }
 .edit-field input,
 .edit-field select {

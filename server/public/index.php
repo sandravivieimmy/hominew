@@ -31,7 +31,7 @@ $router->get('/equipos', [EquipoController::class, 'index']);
 $router->post('/equipos/crear', [EquipoController::class, 'store']);
 $router->post('/equipos/actualizar', [EquipoController::class, 'actualizar']);
 $router->get('/equipos/all', [EquipoController::class, 'equiposAll']);
-$router->post('/equipos/eliminar', [EquipoController::class, 'delete']);
+$router->post('/equipos/eliminar', [EquipoController::class, 'eliminar']);
 
 
 $router->get('/mantenimientos', [MantenimientoController::class, 'index']);

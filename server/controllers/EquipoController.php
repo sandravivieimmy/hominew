@@ -31,6 +31,7 @@ class EquipoController
                 e.placa, 
                 e.registro_invima as registroInvima, 
                 e.clasificacion_invima as clasificacionInvima,
+                e.observaciones,
                 m.frecuencia as frecuenciaMtto,
                 m.fecha_realizado as mttoRealizado,
                 m.fecha_proxima as mttoProximo,
@@ -97,6 +98,7 @@ class EquipoController
                 'placa' => $datos['placa'] ?? '',
                 'registro_invima' => $datos['registro_invima'] ?? '',
                 'clasificacion_invima' => $datos['clasificacion_invima'] ?? '',
+                'observaciones' => mb_substr(trim($datos['observaciones'] ?? ''), 0, 1000),
             ]);
             $equipo->guardar();
 
@@ -143,6 +145,44 @@ class EquipoController
         $equipo->sincronizar($datos);
 
         return $equipo->guardar();
+    }
+
+    // POST /equipos/eliminar  {id} -> borra el equipo junto con su mantenimiento y calibración
+    public static function eliminar($router)
+    {
+        $datos = json_decode(file_get_contents('php://input'), true) ?: [];
+        $id = (int) ($datos['id'] ?? 0);
+
+        $responder = function (int $codigo, array $cuerpo) {
+            http_response_code($codigo);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode($cuerpo);
+            exit;
+        };
+
+        if (!$id || !Equipo::find($id)) {
+            $responder(404, ['ok' => false, 'error' => 'Equipo no encontrado']);
+        }
+
+        $db = Equipo::getDB();
+        $db->begin_transaction();
+        try {
+            foreach (['mantenimientos', 'calibraciones'] as $tabla) {
+                $stmt = $db->prepare("DELETE FROM {$tabla} WHERE equipo_id = ?");
+                $stmt->bind_param('i', $id);
+                $stmt->execute();
+            }
+            $stmt = $db->prepare('DELETE FROM equipos WHERE id = ? LIMIT 1');
+            $stmt->bind_param('i', $id);
+            $stmt->execute();
+            $db->commit();
+        } catch (\Throwable $e) {
+            $db->rollback();
+            error_log('HOMI eliminar equipo: ' . $e->getMessage());
+            $responder(500, ['ok' => false, 'error' => 'No se pudo eliminar el equipo']);
+        }
+
+        $responder(200, ['ok' => true, 'id' => $id]);
     }
 
     public static function delete($id)

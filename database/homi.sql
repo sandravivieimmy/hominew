@@ -233,3 +233,7 @@ UNLOCK TABLES;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2026-11-08 21:35:25
+
+-- ===== 001_equipos_observaciones =====
+-- Campo de observaciones/comentarios de cada equipo (se agrega al final porque los INSERT del dump son posicionales).
+ALTER TABLE equipos ADD COLUMN observaciones TEXT NULL AFTER clasificacion_invima;
