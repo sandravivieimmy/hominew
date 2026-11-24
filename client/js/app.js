@@ -48,6 +48,13 @@ function fmtDateHuman(str) {
     year: "numeric",
   });
 }
+// Solo mes y año (sin día): "jul de 2026"
+function fmtMonthYear(str) {
+  if (str === "FUERA DE SERVICIO") return "Fuera de servicio";
+  const d = parseDate(str);
+  if (!d) return "No aplica";
+  return d.toLocaleDateString("es-CO", { month: "short", year: "numeric" });
+}
 function fmtDateShort(str) {
   const d = parseDate(str);
   if (!d) return "—";
@@ -57,11 +64,22 @@ function fmtDateShort(str) {
   };
 }
 
+// Último día del mes de una fecha
+function endOfMonth(d) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+}
+
+// El cumplimiento es mensual: un equipo programado para noviembre tiene plazo hasta el
+// 30 de noviembre. Solo pasa a "vencido" desde el 1 de diciembre, y el conteo de días
+// vencidos empieza a contar desde ese cierre de mes.
 function statusForDate(dateStr) {
   const d = parseDate(dateStr);
   if (!d) return { status: "na", days: null };
+  const diasAlCierre = daysBetween(endOfMonth(d)); // < 0 => ya terminó el mes programado
+  if (diasAlCierre < 0) return { status: "rojo", days: diasAlCierre };
   const days = daysBetween(d);
-  if (days < 0) return { status: "rojo", days };
+  // La fecha exacta ya pasó pero sigue dentro del mes programado: aún no está vencido
+  if (days < 0) return { status: "amarillo", days: diasAlCierre };
   if (days <= ALERT_WINDOW_DAYS) return { status: "amarillo", days };
   return { status: "verde", days };
 }
@@ -510,7 +528,7 @@ function renderVitals() {
   const el = document.getElementById("vitalsStrip");
   el.innerHTML = `
     <div class="vital">
-      <div class="vital-label"><span class="sq" style="background:var(--cyan-400)"></span>Equipos monitoreados</div>
+      <div class="vital-label"><span class="sq" style="background:var(--accent-400)"></span>Equipos monitoreados</div>
       <div class="vital-value">${s.total}<small>uds</small></div>
       <div class="vital-sub">${UCI_LIST.length} UCIs · HOMI</div>
     </div>
@@ -535,7 +553,7 @@ function renderVitals() {
       <div class="vital-sub">Sin acción requerida</div>
     </div>
     <div class="vital">
-      <div class="vital-label"><span class="sq" style="background:#8FA0AD"></span>Fuera de servicio</div>
+      <div class="vital-label"><span class="sq" style="background:#A9A3E0"></span>Fuera de servicio</div>
       <div class="vital-value">${s.fuera}<small>equipos</small></div>
       <div class="vital-sub">No disponible para uso clínico</div>
     </div>
@@ -562,10 +580,13 @@ function renderAlerts() {
         i._overall.kind === "calibracion"
           ? i.proximaCalibracion
           : i.mttoProximo;
+      // El conteo de días vencidos empieza al cerrar el mes programado
       const daysTxt =
         i._overall.status === "rojo"
           ? `Vencido hace ${Math.abs(i._overall.days)} d`
-          : `Vence en ${i._overall.days} d`;
+          : i._overall.days === 0
+            ? "Vence hoy"
+            : `Vence en ${i._overall.days} d`;
       const resp =
         i._overall.kind === "calibracion"
           ? responsableCal(i)
@@ -579,7 +600,7 @@ function renderAlerts() {
           </div>
           <span class="badge ${cls}">${daysTxt}</span>
         </div>
-        <div class="a-meta"><span>${kindLabel} · ${escapeHtml(resp)}</span><b>${fmtDateHuman(dueDate)}</b></div>
+        <div class="a-meta"><span>${kindLabel} · ${escapeHtml(resp)}</span><b>${fmtMonthYear(dueDate)}</b></div>
       </div>`;
     })
     .join("");
@@ -598,11 +619,11 @@ function miniRingSVG(pct, size = 44) {
     off = c - (pct / 100) * c;
   const color = pct >= 90 ? "#1C9A5B" : pct >= 70 ? "#E09A11" : "#D64545";
   return `<svg class="ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="#EAF0F3" stroke-width="4.5"/>
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="#ECECF7" stroke-width="4.5"/>
     <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="4.5"
       stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}"
       transform="rotate(-90 ${size / 2} ${size / 2})"/>
-    <text x="50%" y="52%" text-anchor="middle" dominant-baseline="middle" font-family="IBM Plex Mono" font-size="11.5" font-weight="700" fill="#0D2233">${pct}</text>
+    <text x="50%" y="52%" text-anchor="middle" dominant-baseline="middle" font-family="IBM Plex Mono" font-size="11.5" font-weight="700" fill="#2A205A">${pct}</text>
   </svg>`;
 }
 
@@ -796,7 +817,7 @@ function donutSVG(segments, size, thickness) {
   const total = segments.reduce((a, s) => a + s.value, 0);
   if (total <= 0) {
     return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="#EAF0F3" stroke-width="${thickness}"/>
+      <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="#ECECF7" stroke-width="${thickness}"/>
     </svg>`;
   }
   let acc = 0;
@@ -816,7 +837,7 @@ function donutSVG(segments, size, thickness) {
     })
     .join("");
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="#EAF0F3" stroke-width="${thickness}"/>
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="#ECECF7" stroke-width="${thickness}"/>
     ${arcs}
   </svg>`;
 }
@@ -908,8 +929,8 @@ function drawNextMonthGauge(prefix, items, kind) {
   const pct = programados ? Math.round((s.proximoMes / programados) * 100) : 0;
   wrap.innerHTML = donutSVG(
     [
-      { value: s.proximoMes, color: "#13A0A8" },
-      { value: s.otras, color: "#C9D6DE" },
+      { value: s.proximoMes, color: "#5C22F4" },
+      { value: s.otras, color: "#D9DBEE" },
     ],
     132,
     14,
@@ -920,8 +941,8 @@ function drawNextMonthGauge(prefix, items, kind) {
   wrap.appendChild(center);
   const label = kind === "mtto" ? "Mantenimientos" : "Calibraciones";
   document.getElementById(`legend-${prefix}`).innerHTML = `
-    <div class="row"><span class="sq" style="background:#13A0A8"></span>${label} próximo mes<b>${s.proximoMes}</b></div>
-    <div class="row"><span class="sq" style="background:#C9D6DE"></span>Otras fechas<b>${s.otras}</b></div>
+    <div class="row"><span class="sq" style="background:#5C22F4"></span>${label} próximo mes<b>${s.proximoMes}</b></div>
+    <div class="row"><span class="sq" style="background:#D9DBEE"></span>Otras fechas<b>${s.otras}</b></div>
     ${s.fuera > 0 ? `<div class="row"><span class="sq" style="background:var(--off-500)"></span>Fuera<b>${s.fuera}</b></div>` : ""}
     ${s.na > 0 ? `<div class="row"><span class="sq" style="background:var(--na-500)"></span>No aplica<b>${s.na}</b></div>` : ""}
   `;
